@@ -1,6 +1,8 @@
 GEM
   remote: http://rubygems.org/
   specs:
+    dalli (2.7.10)
+    dotenv (2.7.5)
     mini_portile2 (2.4.0)
     mustermann (1.0.3)
     nokogiri (1.10.4)
@@ -19,6 +21,8 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  dalli
+  dotenv
   nokogiri
   sinatra
 

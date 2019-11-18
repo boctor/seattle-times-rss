@@ -1,10 +1,10 @@
-require '../seattle_times_rss_parser'
+require './seattle_times_rss_parser'
 
 class FeedItem
   def initialize(filepath)
     @filepath = filepath
-    feed = File.read('./feed.xml')
-    item_text = File.read("./feed_items/#{filepath}")
+    feed = File.read('./spec/feed.xml')
+    item_text = File.read("./spec/feed_items/#{filepath}")
     feed_text = feed.sub("<!-- item -->", item_text)
     @rss = RSS::Parser.parse(feed_text)
   end

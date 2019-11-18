@@ -1,8 +1,16 @@
 require 'rss'
 require 'open-uri'
 require 'nokogiri'
+require 'dalli'
+require 'dotenv'
+Dotenv.load
 
 class SeattleTimesRSSParser
+  def initialize
+    @excluded_categories = Set.new(['Sponsored', 'Explore', 'Diversions'])
+    @included_sources = Set.new(['wordpress'])
+  end
+
   def start
     @rss = RSS::Maker.make("2.0") do |maker|
       open'https://www.seattletimes.com/feed/' do |rss|
@@ -41,28 +49,39 @@ class SeattleTimesRSSParser
   end
   
   def includeItem?(rss_item)
-    # next if existing_item.description.include?("(AP)")
-    # next if existing_item.description.include?("ap-org")
-    # next if existing_item.dc_creator.include?("The Associated Press")
-    # # next if existing_item.dc_creator.include?("Lindsey M. Roberts") //
-    
     if categories_item = rss_item.categories.first
       categories = categories_item.content.split(',').map { |category| category.strip }
-    
-      return false if categories.include? "Sponsored"
-      return false if categories.include? "Explore"
-      return false if categories.include? "Diversions"
-      # next if categories.include? "Nation & World"
+      return false if categories.any? {|category| @excluded_categories.include? category}
     end
 
-
-    doc = Nokogiri::HTML(open(rss_item.link))
-    source = doc.at('meta[name="source"]')['content']
-    # puts source
-    return false unless source == "wordpress"
-    # next if ["WaPo", "NYT", "AP", "TNS Explore"].include? source
+    source = sourceMetaTagFor(rss_item.guid.content)
+    return false unless @included_sources.include? source
     
     return true
+  end
+  
+  def sourceMetaTagFor(link)
+    source = nil
+    if ENV["MEMCACHEDCLOUD_SERVERS"]
+      cache = Dalli::Client.new(ENV["MEMCACHEDCLOUD_SERVERS"].split(","),
+                                {:username => ENV["MEMCACHEDCLOUD_USERNAME"],
+                                 :password => ENV["MEMCACHEDCLOUD_PASSWORD"],
+                                 :expires_in => 86400 #1 day: 60*60*24
+                               })
+      puts("Getting memcache for #{link}")
+      source = cache.get(link)
+    end
+    
+    unless source
+      puts("Getting source by loading #{link}")
+      doc = Nokogiri::HTML(open(link))
+      source = doc.at('meta[name="source"]')['content']
+
+      puts("Setting memcache for #{link} to: #{source}")
+      cache.set(link, source)
+    end
+
+    return source
   end
   
   def renderRSS()
