@@ -8,5 +8,5 @@ task :default => :check_rss
 task :check_rss do
   parser = SeattleTimesRSSParser.new
   parser.start()
-  parser.renderRSS()
+  parser.renderRSS(false)
 end

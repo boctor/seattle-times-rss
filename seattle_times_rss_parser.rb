@@ -2,6 +2,7 @@ require 'rss'
 require 'open-uri'
 require 'nokogiri'
 require 'dalli'
+require 'aws-sdk-s3'
 require 'dotenv'
 Dotenv.load
 
@@ -18,7 +19,7 @@ class SeattleTimesRSSParser
         maker.channel.description = feed.channel.description
         maker.channel.lastBuildDate = feed.channel.lastBuildDate
         maker.channel.link = feed.channel.link
-        maker.channel.title = feed.channel.title
+        maker.channel.title = 'The Seattle Times' #feed.channel.title # Current title in feed is 'The Seattle Times The Seattle Times'
         maker.channel.language = feed.channel.language
         maker.channel.generator = feed.channel.generator
 
@@ -62,12 +63,9 @@ class SeattleTimesRSSParser
   
   def sourceMetaTagFor(link)
     source = nil
-    if ENV["MEMCACHEDCLOUD_SERVERS"]
-      cache = Dalli::Client.new(ENV["MEMCACHEDCLOUD_SERVERS"].split(","),
-                                {:username => ENV["MEMCACHEDCLOUD_USERNAME"],
-                                 :password => ENV["MEMCACHEDCLOUD_PASSWORD"],
-                                 :expires_in => 86400 #1 day: 60*60*24
-                               })
+    cache = nil
+    if ENV["MEMCACHED_SERVER"]
+      cache = Dalli::Client.new(ENV["MEMCACHED_SERVER"].split(","), {:expires_in => 86400 })  #1 day: 60*60*24
       puts("Getting memcache for #{link}")
       source = cache.get(link)
     end
@@ -77,14 +75,22 @@ class SeattleTimesRSSParser
       doc = Nokogiri::HTML(open(link))
       source = doc.at('meta[name="source"]')['content']
 
-      puts("Setting memcache for #{link} to: #{source}")
-      cache.set(link, source)
+      if cache
+        puts("Setting memcache for #{link} to: #{source}")
+        cache.set(link, source)
+      end
     end
 
     return source
   end
   
-  def renderRSS()
+  def renderRSS(uploadToS3=true)
+    if uploadToS3
+      s3 = Aws::S3::Resource.new
+      obj = s3.bucket('rss.theappuniverse.com').object('seattletimes.xml')
+      obj.put(body: @rss.to_s)
+    end
+    
     puts @rss
     @rss.to_s
   end
