@@ -3,6 +3,7 @@ require 'open-uri'
 require 'nokogiri'
 require 'dalli'
 require 'aws-sdk-s3'
+require 'uri'
 require 'dotenv'
 Dotenv.load
 
@@ -16,10 +17,10 @@ class SeattleTimesRSSParser
     @rss = RSS::Maker.make("2.0") do |maker|
       open'https://www.seattletimes.com/feed/' do |rss|
         feed = RSS::Parser.parse(rss)
-        maker.channel.description = feed.channel.description
+        maker.channel.description = "A custom RSS feed for The Seattle Times that excludes all syndicated content and only includes articles created by The Seattle Times staff."
         maker.channel.lastBuildDate = feed.channel.lastBuildDate
-        maker.channel.link = feed.channel.link
-        maker.channel.title = 'The Seattle Times' #feed.channel.title # Current title in feed is 'The Seattle Times The Seattle Times'
+        maker.channel.link = 'https://rss.theappuniverse.com'
+        maker.channel.title = 'The Seattle Times original content'
         maker.channel.language = feed.channel.language
         maker.channel.generator = feed.channel.generator
 
@@ -41,7 +42,7 @@ class SeattleTimesRSSParser
        end
       new_item.comments = rss_item.comments
       new_item.description = rss_item.description
-      new_item.guid.content = rss_item.guid.content
+      new_item.guid.content = generateGUID(rss_item.guid.content)
       new_item.dc_creator = rss_item.dc_creator
       new_item.link = rss_item.link
       new_item.title = rss_item.title
@@ -59,6 +60,18 @@ class SeattleTimesRSSParser
     return false unless @included_sources.include? source
     
     return true
+  end
+
+  def generateGUID(link)
+    begin
+      uri = URI.parse(link)
+      new_query_ar = URI.decode_www_form(uri.query || '') << ["utm_campaign", "RSS_appuniverse"]
+      uri.query = URI.encode_www_form(new_query_ar)
+      return uri.to_s
+      
+    rescue
+      return link
+    end
   end
   
   def sourceMetaTagFor(link)
