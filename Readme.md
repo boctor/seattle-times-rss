@@ -36,11 +36,15 @@ bundle install --deployment
 ```
 Deploying to Lambda can be done using the [AWS CLI](https://aws.amazon.com/cli/). First all the relevant files are zipped and then uploaded to Lambda:
 
+```
 zip -r seattletimes.zip lambda_function.rb seattle_times_rss_parser.rb vendor
 aws lambda update-function-code --function-name seattletimes --zip-file fileb://seattletimes.zip
+```
 
 To manually kick off Lambda execution:
+```
 aws lambda invoke --function-name seattletimes response.json
+```
 
 ## Running the tests
 
